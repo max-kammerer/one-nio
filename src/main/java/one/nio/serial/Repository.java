@@ -75,6 +75,8 @@ public class Repository {
     private static byte nextBootstrapUid = DataStream.FIRST_BOOT_UID;
     private static int options = Integer.getInteger("one.nio.serial.options", DEFAULT_OPTIONS);
 
+    private static final Options options2 = new Options(Boolean.getBoolean("one.nio.serial.debug.dump_generated_serializers"));
+
     static {
         addBootstrap(new IntegerSerializer());
         addBootstrap(new LongSerializer());
@@ -376,7 +378,7 @@ public class Repository {
                     if (cls.getName().startsWith("java.time.") && JavaInternals.findMethod(cls, "writeReplace") != null) {
                         serializer = new JavaTimeSerializer(cls);
                     } else {
-                        serializer = new GeneratedSerializer(cls);
+                        serializer = new GeneratedSerializer(cls, Repository.options2);
                     }
                 } else {
                     serializer = new InvalidSerializer(cls);

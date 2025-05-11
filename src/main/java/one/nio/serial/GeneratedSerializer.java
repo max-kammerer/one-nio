@@ -42,8 +42,9 @@ public class GeneratedSerializer extends Serializer {
     private FieldDescriptor[] fds;
     private FieldDescriptor[] defaultFields;
     private Delegate delegate;
+    private final Options options;
 
-    GeneratedSerializer(Class cls) {
+    GeneratedSerializer(Class cls, Options options) {
         super(cls);
 
         Field[] ownFields = getSerializableFields();
@@ -54,6 +55,7 @@ public class GeneratedSerializer extends Serializer {
         this.defaultFields = new FieldDescriptor[0];
 
         checkFieldTypes();
+        this.options = options;
         this.delegate = DelegateGenerator.instantiate(cls, fds, code());
     }
 
@@ -309,6 +311,10 @@ public class GeneratedSerializer extends Serializer {
             }
             throw e;
         }
+    }
+
+    public Delegate getDelegate() {
+        return delegate;
     }
 
     private void checkFieldTypes() {

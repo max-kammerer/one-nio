@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
 import one.nio.mgt.Management;
+import one.nio.serial.AsmUtils;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -68,6 +69,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         if (dumpPath != null && !"".equals(dumpPath)) {
             dumpClass(classData, result.getSimpleName());
         }
+        AsmUtils.printify(classData, System.out);
         return result;
     }
 
