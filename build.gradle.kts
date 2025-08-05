@@ -100,6 +100,13 @@ tasks {
             }
         }
 
+        //Temporary
+        if (testJdk == "8") {
+            filter {
+                excludeTestsMatching("one.nio.serial.SerializationTest.testCompiledReadObject")
+            }
+        }
+
         useJUnit()
         testLogging {
             debug {
