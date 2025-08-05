@@ -219,11 +219,9 @@ public class DelegateGenerator extends BytecodeGenerator {
 
         boolean isRecord = JavaFeatures.isRecord(cls);
         mv.visitVarInsn(ALOAD, 1);
-        if (!isRecord) {
-            emitNewInstance(mv, className, cls);
-            mv.visitInsn(DUP_X1);
-            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
-        }
+        emitNewInstance(mv, className, cls);
+        mv.visitInsn(DUP_X1);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
 
         ArrayList<Field> parents = new ArrayList<>();
 
@@ -253,7 +251,7 @@ public class DelegateGenerator extends BytecodeGenerator {
                 mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", srcType.readMethod(), srcType.readSignature(), false);
 
                 //TODO: improve
-                if (strategy instanceof MagicAccessorStrategy || sourceClass != ownField.getType()) {
+                if (isRecord || strategy instanceof MagicAccessorStrategy || sourceClass != ownField.getType()) {
                     if (srcType == FieldType.Object) emitTypeCast(mv, Object.class, sourceClass);
                     emitTypeCast(mv, sourceClass, ownField.getType());
                 }
@@ -882,14 +880,18 @@ public class DelegateGenerator extends BytecodeGenerator {
     }
 
     private static void emitNewInstance(MethodVisitor mv, String className, Class<?> clazz) {
-        mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
+        if (Modifier.isPublic(clazz.getModifiers())) {
+            mv.visitTypeInsn(NEW, Type.getType(clazz).getInternalName());
+        } else {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
 
-        loadClassSafe(mv, clazz);
+            loadClassSafe(mv, clazz);
 
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
-                "(Ljava/lang/Class;)Ljava/lang/Object;", false);
-        if (className == null) {
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
+                    "(Ljava/lang/Class;)Ljava/lang/Object;", false);
+            //if (className == null) {
             mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(clazz));
+            //}
         }
     }
 

@@ -85,9 +85,9 @@ public class RecordTest {
     }
 
 
-    static class SameRecordTwoTimes implements Serializable {
+    public static class SameRecordTwoTimes implements Serializable {
 
-        record Simple(String data, String data2) implements Serializable {}
+        public record Simple(String data, String data2) implements Serializable {}
 
         private Simple record;
 

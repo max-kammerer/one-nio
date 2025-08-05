@@ -68,10 +68,10 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     }
 
     public Class<?> defineClass(byte[] classData) {
-        if (printClassesAsTextInConsole) {
+        if (true) {
             AsmUtils.printify(classData, System.out);
         }
-        if (verifyBytecode) {
+        if (true) {
             AsmUtils.verifyBytecode(classData);
         }
         Class<?> result = super.defineClass(null, classData, 0, classData.length, null);
