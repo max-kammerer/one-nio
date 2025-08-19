@@ -23,7 +23,6 @@ import static java.nio.file.StandardOpenOption.WRITE;
 import java.io.IOException;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -50,7 +49,8 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     protected final AtomicInteger totalClasses;
     protected final AtomicInteger totalBytes;
     protected String dumpPath;
-    protected boolean printClassAsText;
+    protected boolean printClassesAsTextInConsole;
+    protected boolean verifyBytecode;
 
     public BytecodeGenerator() {
         this(BytecodeGenerator.class.getClassLoader());
@@ -61,18 +61,22 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         this.totalClasses = new AtomicInteger();
         this.totalBytes = new AtomicInteger();
         this.dumpPath = System.getProperty("one.nio.gen.dump");
-        this.printClassAsText = Boolean.getBoolean("one.nio.gen.debug.dump_generated_serializers_as_text");
+        this.printClassesAsTextInConsole = Boolean.getBoolean("one.nio.gen.debug.dump_generated_classes_as_text");
+        this.verifyBytecode = Boolean.getBoolean("one.nio.gen.verify_bytecode");
     }
 
     public Class<?> defineClass(byte[] classData) {
+        if (printClassesAsTextInConsole) {
+            AsmUtils.printify(classData, System.out);
+        }
+        if (verifyBytecode) {
+            AsmUtils.verifyBytecode(classData);
+        }
         Class<?> result = super.defineClass(null, classData, 0, classData.length, null);
         totalClasses.incrementAndGet();
         totalBytes.addAndGet(classData.length);
         if (dumpPath != null && !"".equals(dumpPath)) {
             dumpClass(classData, result.getSimpleName());
-        }
-        if (printClassAsText) {
-            AsmUtils.printify(classData, System.out);
         }
         return result;
     }

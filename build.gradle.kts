@@ -110,6 +110,7 @@ tasks {
         if (project.hasProperty("one.nio.gen.debug.dump_generated_serializers_as_text")) {
             systemProperty("one.nio.gen.debug.dump_generated_serializers_as_text", project.property("one.nio.gen.debug.dump_generated_serializers_as_text").toString())
         }
+        systemProperty("one.nio.gen.verify_bytecode", true)
 
         useJUnit()
         testLogging {
