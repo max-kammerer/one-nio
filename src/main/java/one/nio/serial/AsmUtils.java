@@ -23,7 +23,10 @@ public class AsmUtils {
         ClassReader classReader = new ClassReader(classData);
         PrintWriter printWriter = new PrintWriter(out);
         classReader.accept(new TraceClassVisitor(printWriter), ClassReader.SKIP_DEBUG);
-        //classReader.accept(new CheckClassAdapter(new MyVisitor(Opcodes.ASM9)), ClassReader.SKIP_DEBUG);
+    }
 
+    public static void verifyBytecode(byte[] classData) {
+        ClassReader classReader = new ClassReader(classData);
+        classReader.accept(new CheckClassAdapter(new MyVisitor(Opcodes.ASM9)), ClassReader.SKIP_DEBUG);
     }
 }

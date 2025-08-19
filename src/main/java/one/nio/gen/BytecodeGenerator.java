@@ -51,6 +51,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     protected final AtomicInteger totalBytes;
     protected String dumpPath;
     protected boolean printClassAsText;
+    protected boolean verifyBytecode;
 
     public BytecodeGenerator() {
         this(BytecodeGenerator.class.getClassLoader());
@@ -62,6 +63,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         this.totalBytes = new AtomicInteger();
         this.dumpPath = System.getProperty("one.nio.gen.dump");
         this.printClassAsText = Boolean.getBoolean("one.nio.gen.debug.dump_generated_serializers_as_text");
+        this.verifyBytecode = Boolean.getBoolean("one.nio.gen.verify_bytecode");
     }
 
     public Class<?> defineClass(byte[] classData) {
@@ -73,6 +75,9 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         }
         if (printClassAsText) {
             AsmUtils.printify(classData, System.out);
+        }
+        if (verifyBytecode) {
+            AsmUtils.verifyBytecode(classData);
         }
         return result;
     }
