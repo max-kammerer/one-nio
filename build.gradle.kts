@@ -30,10 +30,25 @@ dependencies {
 
 val currentJdk = System.getProperty("java.specification.version").substringAfter(".")
 val testJdk = System.getProperty("test.jdk", currentJdk).substringBefore("-") //process ea build, e.g. 25-ea
+val multiReleaseJdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
 
 java {
     withJavadocJar()
     withSourcesJar()
+}
+
+if ((testJdk.toIntOrNull() ?: 0) >= 16) {
+    val testJava16 by tasks.registering(Test::class) {
+        description = "Runs additional Java 16 specific tests."
+        group = LifecycleBasePlugin.VERIFICATION_GROUP
+
+        testClassesDirs = sourceSets["testJava16"].output.classesDirs
+        classpath = sourceSets["testJava16"].runtimeClasspath
+    }
+
+    tasks.named<Test>("test") {
+        finalizedBy(testJava16)
+    }
 }
 
 sourceSets {
@@ -43,6 +58,15 @@ sourceSets {
         }
         compileClasspath += sourceSets.main.get().output
         runtimeClasspath += sourceSets.main.get().output
+    }
+
+    create("testJava16") {
+        java {
+            srcDir("src/test/java16")
+        }
+        // Include standard test outputs so Java16 tests can import test fixtures like one.nio.serial.sample.Sample
+        compileClasspath += sourceSets.test.get().output + sourceSets.test.get().compileClasspath + sourceSets.main.get().output
+        runtimeClasspath += sourceSets.test.get().output + sourceSets.test.get().runtimeClasspath + sourceSets.main.get().output
     }
 }
 
@@ -63,12 +87,24 @@ tasks {
 
     named<JavaCompile>("compileJava9Java") {
         javaCompiler = project.javaToolchains.compilerFor {
-            val jdk = testJdk.takeIf { it != "8" } ?: currentJdk.takeIf { it != "8" } ?: "21"
-            languageVersion = JavaLanguageVersion.of(jdk)
+            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
         }
         options.release.set(9)
+        sourceCompatibility = "9"
+        targetCompatibility = "9"
 
         dependsOn(named("compileJava"))
+    }
+
+    // Configure Java 16 test compilation toolchain
+    named<JavaCompile>("compileTestJava16Java") {
+        options.release.set(16)
+        sourceCompatibility = "16"
+        targetCompatibility = "16"
+        javaCompiler = project.javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(multiReleaseJdk)
+        }
+        dependsOn(named("compileTestJava"))
     }
 
     jar {
