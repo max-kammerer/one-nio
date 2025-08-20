@@ -19,7 +19,6 @@ package one.nio.serial.gen;
 import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.*;
 import one.nio.serial.gen.strategy.GenerationStrategy;
-import one.nio.serial.gen.strategy.HandlesStrategy;
 import one.nio.serial.gen.strategy.MagicAccessorStrategy;
 import one.nio.util.JavaFeatures;
 import one.nio.util.JavaInternals;
@@ -36,10 +35,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -50,8 +46,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static one.nio.serial.AsmUtils.OBJECT_TYPE;
-import static one.nio.util.JavaInternals.unsafe;
+import static one.nio.serial.gen.strategy.HandlesStrategy.loadPrimitiveType;
 
 public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();
@@ -268,7 +263,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         }
 
         if (isRecord) {
-            generateCreateRecord(mv, cls, fds, defaultFields);
+            generateCreateRecord(mv, cls, className, fds, defaultFields);
         }
 
         emitReadObject(cls, mv, className);
@@ -526,7 +521,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitInsn(POP);
 
         if (isRecord) {
-            generateCreateRecord(mv, cls, fds, defaultFields);
+            generateCreateRecord(mv, cls, className, fds, defaultFields);
         }
 
         emitReadObject(cls, mv, className);
@@ -622,7 +617,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readMap", "()Ljava/util/Map;", false);
             //emitTypeCast(mv, Map.class, fieldClass);
         } else if (isConcreteClass(fieldClass)) {
-            mv.visitLdcInsn(Type.getType(fieldClass));
+            loadClassSafe(mv, fieldClass);
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readObject", "(Ljava/lang/Class;)Ljava/lang/Object;", false);
             //emitTypeCast(mv, Object.class, fieldClass);
         } else {
@@ -633,7 +628,25 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitLabel(done);
     }
 
-    private static void generateCreateRecord(MethodVisitor mv, Class<?> cls, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
+    private static void generateCreateRecord(MethodVisitor mv, Class<?> cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
+        Class<?>[] args = getConstructorArgs(fds, defaultFields);
+        int length = args.length;
+
+        mv.visitInsn(DUP);
+
+        try {
+            Constructor c = cls.getDeclaredConstructor(args);
+            strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c, (v) -> {
+                for (int i = 0; i < length; i++) {
+                    v.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
+                }
+            });
+        } catch (NoSuchMethodException e) {
+            throw new IllegalArgumentException("Cannot find matching canonical constructor for " + cls.getName());
+        }
+    }
+
+    public static Class<?>[] getConstructorArgs(FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
         Class<?>[] args = new Class[fds.length + defaultFields.length];
         for (FieldDescriptor fd : fds) {
             if (fd.ownField() != null) {
@@ -651,17 +664,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         if (length != args.length) {
             args = Arrays.copyOf(args, length);
         }
-
-        mv.visitInsn(DUP);
-        for (int i = 0; i < length; i++) {
-            mv.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
-        }
-
-        try {
-            emitInvoke(mv, cls.getDeclaredConstructor(args));
-        } catch (NoSuchMethodException e) {
-            throw new IllegalArgumentException("Cannot find matching canonical constructor for " + cls.getName());
-        }
+        return args;
     }
 
     private static boolean isConcreteClass(Class cls) {
@@ -691,7 +694,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             if (m == null || !Modifier.isStatic(m.getModifiers()) || !fieldType.isAssignableFrom(m.getReturnType())) {
                 throw new IllegalArgumentException("Invalid default initializer " + methodName + " for field " + field);
             }
-            emitInvoke(mv, m);
+            emitConstructorInvoke(mv, m);
         } else if (!defaultValue.field().isEmpty()) {
             String fieldName = defaultValue.field();
             int p = fieldName.lastIndexOf('.');
@@ -742,7 +745,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             try {
                 MethodHandleInfo valueOf = MethodHandlesReflection.findStaticMethodOrThrow(fieldType, "valueOf", MethodType.methodType(fieldType, String.class));
                 mv.visitLdcInsn(value);
-                emitInvoke(mv, valueOf);
+                emitConstructorInvoke(mv, valueOf);
             } catch (NoSuchMethodException | IllegalAccessException e) {
                 throw new IllegalArgumentException("Cannot set default value \"" + value + "\" to " + field, e);
             }
@@ -831,7 +834,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         // Dst.valueOf(src)
         MethodHandleInfo valueOf = MethodHandlesReflection.findStaticMethod(dst, "valueOf", MethodType.methodType(dst, src));
         if (valueOf != null) {
-            emitInvoke(mv, valueOf);
+            emitConstructorInvoke(mv, valueOf);
             return;
         }
 
@@ -839,7 +842,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         for (Method m : src.getMethods()) {
             if (!Modifier.isStatic(m.getModifiers()) && m.getParameterTypes().length == 0 && m.getReturnType() == dst) {
                 Label isNull = emitNullGuard(mv, dst);
-                emitInvoke(mv, m);
+                emitConstructorInvoke(mv, m);
                 mv.visitLabel(isNull);
                 return;
             }
@@ -880,7 +883,7 @@ public class DelegateGenerator extends BytecodeGenerator {
     private static void emitNewInstance(MethodVisitor mv, String className, Class<?> clazz) {
         mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
 
-        emitClassForName(mv, clazz);
+        loadClassSafe(mv, clazz);
 
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
                 "(Ljava/lang/Class;)Ljava/lang/Object;", false);
@@ -889,8 +892,12 @@ public class DelegateGenerator extends BytecodeGenerator {
         }
     }
 
-    public static void emitClassForName(MethodVisitor mv, Class<?> clazz) {
-        mv.visitLdcInsn(clazz.getName());
-        mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+    public static void loadClassSafe(MethodVisitor mv, Class<?> clazz) {
+        if (clazz.isPrimitive()) {
+            loadPrimitiveType(mv, clazz);
+        } else {
+            mv.visitLdcInsn(clazz.getName());
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+        }
     }
 }

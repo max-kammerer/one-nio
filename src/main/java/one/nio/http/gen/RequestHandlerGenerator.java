@@ -82,7 +82,7 @@ public class RequestHandlerGenerator extends BytecodeGenerator {
         mv.visitVarInsn(ALOAD, 0);
         mv.visitFieldInsn(GETFIELD, className, "router", routerType);
         Label invalidArgumentHandler = setupArguments(mv, m);
-        emitInvoke(mv, m);
+        emitConstructorInvoke(mv, m);
 
         if (m.getReturnType() == Response.class) {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/http/HttpSession", "sendResponse", "(Lone/nio/http/Response;)V", false);
