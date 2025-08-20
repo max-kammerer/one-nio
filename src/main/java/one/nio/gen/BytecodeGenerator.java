@@ -32,6 +32,8 @@ import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicInteger;
 import one.nio.mgt.Management;
 import one.nio.serial.AsmUtils;
+import one.nio.serial.gen.strategy.HandlesStrategy;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -67,17 +69,17 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
     }
 
     public Class<?> defineClass(byte[] classData) {
+        if (true || printClassAsText) {
+            AsmUtils.printify(classData, System.out);
+        }
+        if (true || verifyBytecode) {
+            AsmUtils.verifyBytecode(classData);
+        }
         Class<?> result = super.defineClass(null, classData, 0, classData.length, null);
         totalClasses.incrementAndGet();
         totalBytes.addAndGet(classData.length);
         if (dumpPath != null && !"".equals(dumpPath)) {
             dumpClass(classData, result.getSimpleName());
-        }
-        if (printClassAsText) {
-            AsmUtils.printify(classData, System.out);
-        }
-        if (verifyBytecode) {
-            AsmUtils.verifyBytecode(classData);
         }
         return result;
     }
@@ -123,7 +125,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         mv.visitFieldInsn(opcode, holder, name, sig);
     }
 
-    public static void emitInvoke(MethodVisitor mv, Method m) {
+    public static void emitConstructorInvoke(MethodVisitor mv, Method m) {
         int opcode;
         if ((m.getModifiers() & Modifier.STATIC) != 0) {
             opcode = INVOKESTATIC;
@@ -141,7 +143,7 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
         mv.visitMethodInsn(opcode, holder, name, sig, opcode == INVOKEINTERFACE);
     }
 
-    public static void emitInvoke(MethodVisitor mv, MethodHandleInfo m) {
+    public static void emitConstructorInvoke(MethodVisitor mv, MethodHandleInfo m) {
         int opcode;
         if ((m.getModifiers() & Modifier.STATIC) != 0) {
             opcode = INVOKESTATIC;
@@ -165,12 +167,6 @@ public class BytecodeGenerator extends ClassLoader implements BytecodeGeneratorM
             b.append(Type.getDescriptor(parameter));
         }
         return b.append(')').append(Type.getDescriptor(method.returnType())).toString();
-    }
-
-    public static void emitInvoke(MethodVisitor mv, Constructor c) {
-        String holder = Type.getInternalName(c.getDeclaringClass());
-        String sig = Type.getConstructorDescriptor(c);
-        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig, false);
     }
 
     public static void emitThrow(MethodVisitor mv, String exceptionClass, String message) {

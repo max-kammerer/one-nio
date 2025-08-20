@@ -1,9 +1,12 @@
 package one.nio.serial.gen.strategy;
 
 
+import one.nio.gen.BytecodeGenerator;
 import one.nio.serial.FieldDescriptor;
 import one.nio.serial.SerializeWith;
+import one.nio.serial.gen.DelegateGenerator;
 import one.nio.serial.gen.FieldType;
+import one.nio.util.JavaFeatures;
 import one.nio.util.MethodHandlesReflection;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -15,8 +18,10 @@ import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.sql.Array;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -67,6 +72,16 @@ public final class HandlesStrategy extends GenerationStrategy {
             generateFieldForStaticVarOrMethodHandlerIfNeeded(cv, fd);
         }
 
+        if (JavaFeatures.isRecord(cls)) {
+            cv.visitField(
+                    ACC_PRIVATE | ACC_STATIC | ACC_FINAL,
+                    "$$$constructor",
+                    "Ljava/lang/invoke/MethodHandle;",
+                    null,
+                    null
+            ).visitEnd();
+        }
+
         generateClassInit(cv, cls, className, fds, defaultFields, parentDescriptors);
     }
 
@@ -93,6 +108,15 @@ public final class HandlesStrategy extends GenerationStrategy {
             initializeFieldAccessorsIfNeeded(cls, className, fd, mv, true);
         }
 
+        if (JavaFeatures.isRecord(cls)) {
+            emitConstructorHandleObtain(mv, cls, DelegateGenerator.getConstructorArgs(fds, defaultFields));
+            mv.visitFieldInsn(
+                    PUTSTATIC,
+                    className,
+                    "$$$constructor",
+                    Type.getDescriptor(MethodHandle.class)
+            );
+        }
 
         mv.visitInsn(RETURN);
         mv.visitMaxs(0, 0);
@@ -340,6 +364,24 @@ public final class HandlesStrategy extends GenerationStrategy {
         mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodHandlesReflection.class).getInternalName(), "findMHInstanceMethodOrThrow", Type.getMethodDescriptor(Type.getType(MethodHandle.class), Type.getType(Class.class), Type.getType(String.class), Type.getType(MethodType.class)), false);
     }
 
+    private static void emitConstructorHandleObtain(MethodVisitor mv, Class clazz, Class... args) {
+        emitClassForName(mv, Void.TYPE);
+
+        mv.visitLdcInsn(args.length);
+        mv.visitTypeInsn(ANEWARRAY, Type.getType(Class.class).getInternalName());
+        int index = 0;
+        for (Class cl: args) {
+            mv.visitInsn(DUP);
+            mv.visitLdcInsn(index++);
+            mv.visitLdcInsn(Type.getType(cl));
+            mv.visitInsn(AASTORE);
+        }
+
+        mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodType.class).getInternalName(), "methodType", Type.getMethodDescriptor(Type.getType(MethodType.class), Type.getType(Class[].class)), false);
+
+        mv.visitMethodInsn(INVOKESTATIC, Type.getType(MethodHandlesReflection.class).getInternalName(), "findMHConstructorOrThrow", Type.getMethodDescriptor(Type.getType(MethodHandle.class), Type.getType(Class.class), Type.getType(MethodType.class)), false);
+    }
+
     @Override
     public void emitReadSerialField(MethodVisitor mv, Class clazz, Field field, String serializerClassName) {
         Type erasedFieldType = field.getType().isPrimitive() ? Type.getType(field.getType()) : OBJECT_TYPE;;
@@ -359,5 +401,13 @@ public final class HandlesStrategy extends GenerationStrategy {
             mv.visitMethodInsn(INVOKESTATIC, serializerClassName, "vhSet_" + HandlesStrategy.getVarHandleName(field), description, false);
 
         }
+    }
+
+
+    @Override
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor) {
+        mv.visitFieldInsn(GETSTATIC, className, "$$$constructor", Type.getDescriptor(MethodHandle.class));
+        Type[] types = Arrays.stream(constuctor.getParameterTypes()).map(Type::getType).toArray(Type[]::new);
+        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getType(MethodHandle.class).getInternalName(), "invoke", Type.getMethodDescriptor(Type.getType(void.class), types), false);
     }
 }

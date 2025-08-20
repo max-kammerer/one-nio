@@ -13,13 +13,13 @@ import org.objectweb.asm.Type;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
 
 import static one.nio.gen.BytecodeGenerator.*;
-import static one.nio.serial.AsmUtils.OBJECT_TYPE;
 import static one.nio.util.JavaInternals.unsafe;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
@@ -69,12 +69,12 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
 
     @Override
     public void emitWriteObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType) {
-        emitInvoke(mv, methodType);
+        emitConstructorInvoke(mv, methodType);
     }
 
     @Override
     public void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType) {
-        emitInvoke(mv, methodType);
+        emitConstructorInvoke(mv, methodType);
 
     }
 
@@ -84,7 +84,7 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
         if (serializeWith != null && !serializeWith.getter().isEmpty()) {
             try {
                 MethodHandleInfo m = MethodHandlesReflection.findInstanceMethodOrThrow(field.getDeclaringClass(), serializeWith.getter(), MethodType.methodType(field.getType()));
-                emitInvoke(mv, m);
+                emitConstructorInvoke(mv, m);
             } catch (NoSuchMethodException e) {
                 throw new IllegalArgumentException("Getter method not found", e);
             } catch (IllegalAccessException e) {
@@ -101,7 +101,7 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
         if (serializeWith != null && !serializeWith.setter().isEmpty()) {
             try {
                 MethodHandleInfo m = MethodHandlesReflection.findInstanceMethodOrThrow(field.getDeclaringClass(), serializeWith.setter(), MethodType.methodType(void.class, field.getType()));
-                emitInvoke(mv, m);
+                emitConstructorInvoke(mv, m);
             } catch (NoSuchMethodException e) {
                 throw new IllegalArgumentException("Setter method not found", e);
             } catch (IllegalAccessException e) {
@@ -114,5 +114,12 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
         } else {
             emitPutField(mv, field);
         }
+    }
+
+    @Override
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor) {
+        String holder = Type.getInternalName(constuctor.getDeclaringClass());
+        String sig = Type.getConstructorDescriptor(constuctor);
+        mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig, false);
     }
 }
