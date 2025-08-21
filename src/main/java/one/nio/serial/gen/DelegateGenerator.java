@@ -632,8 +632,6 @@ public class DelegateGenerator extends BytecodeGenerator {
         Class<?>[] args = getConstructorArgs(fds, defaultFields);
         int length = args.length;
 
-        mv.visitInsn(DUP);
-
         try {
             Constructor c = cls.getDeclaredConstructor(args);
             strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c, (v) -> {
