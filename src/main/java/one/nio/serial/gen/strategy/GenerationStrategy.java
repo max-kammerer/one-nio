@@ -8,6 +8,7 @@ import org.objectweb.asm.MethodVisitor;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.util.function.Consumer;
 
 public abstract class GenerationStrategy {
 
@@ -23,7 +24,7 @@ public abstract class GenerationStrategy {
 
     public abstract void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType);
 
-    public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor);
+    public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator);
 
     public static GenerationStrategy createStrategy() {
         if (JavaVersion.isJava9Plus()) { //TODO: also check runtime flag

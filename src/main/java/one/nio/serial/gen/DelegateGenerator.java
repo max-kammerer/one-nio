@@ -46,6 +46,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static one.nio.serial.gen.strategy.HandlesStrategy.loadPrimitiveType;
+
 public class DelegateGenerator extends BytecodeGenerator {
     private static final AtomicInteger index = new AtomicInteger();
     private static final GenerationStrategy strategy = GenerationStrategy.createStrategy();
@@ -615,7 +617,7 @@ public class DelegateGenerator extends BytecodeGenerator {
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readMap", "()Ljava/util/Map;", false);
             //emitTypeCast(mv, Map.class, fieldClass);
         } else if (isConcreteClass(fieldClass)) {
-            mv.visitLdcInsn(Type.getType(fieldClass));
+            loadClassSafe(mv, fieldClass);
             mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/JsonReader", "readObject", "(Ljava/lang/Class;)Ljava/lang/Object;", false);
             //emitTypeCast(mv, Object.class, fieldClass);
         } else {
@@ -631,13 +633,14 @@ public class DelegateGenerator extends BytecodeGenerator {
         int length = args.length;
 
         mv.visitInsn(DUP);
-        for (int i = 0; i < length; i++) {
-            mv.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
-        }
 
         try {
             Constructor c = cls.getDeclaredConstructor(args);
-            strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c);
+            strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c, (v) -> {
+                for (int i = 0; i < length; i++) {
+                    v.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
+                }
+            });
         } catch (NoSuchMethodException e) {
             throw new IllegalArgumentException("Cannot find matching canonical constructor for " + cls.getName());
         }
@@ -880,7 +883,7 @@ public class DelegateGenerator extends BytecodeGenerator {
     private static void emitNewInstance(MethodVisitor mv, String className, Class<?> clazz) {
         mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(JavaInternals.class), "unsafe", "Lsun/misc/Unsafe;");
 
-        emitClassForName(mv, clazz);
+        loadClassSafe(mv, clazz);
 
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "sun/misc/Unsafe", "allocateInstance",
                 "(Ljava/lang/Class;)Ljava/lang/Object;", false);
@@ -889,8 +892,12 @@ public class DelegateGenerator extends BytecodeGenerator {
         }
     }
 
-    public static void emitClassForName(MethodVisitor mv, Class<?> clazz) {
-        mv.visitLdcInsn(clazz.getName());
-        mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+    public static void loadClassSafe(MethodVisitor mv, Class<?> clazz) {
+        if (clazz.isPrimitive()) {
+            loadPrimitiveType(mv, clazz);
+        } else {
+            mv.visitLdcInsn(clazz.getName());
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/Class", "forName", Type.getMethodDescriptor(Type.getType(Class.class), Type.getType(String.class)), false);
+        }
     }
 }

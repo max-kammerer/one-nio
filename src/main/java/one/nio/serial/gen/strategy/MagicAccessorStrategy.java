@@ -18,6 +18,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
+import java.util.function.Consumer;
 
 import static one.nio.gen.BytecodeGenerator.*;
 import static one.nio.util.JavaInternals.unsafe;
@@ -117,7 +118,8 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
     }
 
     @Override
-    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor) {
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator) {
+        argGenerator.accept(mv);
         String holder = Type.getInternalName(constuctor.getDeclaringClass());
         String sig = Type.getConstructorDescriptor(constuctor);
         mv.visitMethodInsn(INVOKESPECIAL, holder, "<init>", sig, false);
