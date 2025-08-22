@@ -217,13 +217,16 @@ public class DelegateGenerator extends BytecodeGenerator {
                 null, new String[]{"java/io/IOException", "java/lang/ClassNotFoundException"});
         mv.visitCode();
 
+        boolean isRecord = JavaFeatures.isRecord(cls);
         mv.visitVarInsn(ALOAD, 1);
-        emitNewInstance(mv, className, cls);
-        mv.visitInsn(DUP_X1);
-        mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+        if (!isRecord) {
+            emitNewInstance(mv, className, cls);
+            mv.visitInsn(DUP_X1);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+        }
 
         ArrayList<Field> parents = new ArrayList<>();
-        boolean isRecord = JavaFeatures.isRecord(cls);
+
         for (FieldDescriptor fd : fds) {
             Field ownField = fd.ownField();
             Field parentField = fd.parentField();
@@ -263,7 +266,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         }
 
         if (isRecord) {
-            generateCreateRecord(mv, cls, className, fds, defaultFields);
+            generateCreateRecord(mv, cls, className, fds, defaultFields, true);
         }
 
         emitReadObject(cls, mv, className);
@@ -521,7 +524,7 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitInsn(POP);
 
         if (isRecord) {
-            generateCreateRecord(mv, cls, className, fds, defaultFields);
+            generateCreateRecord(mv, cls, className, fds, defaultFields, false);
         }
 
         emitReadObject(cls, mv, className);
@@ -628,13 +631,13 @@ public class DelegateGenerator extends BytecodeGenerator {
         mv.visitLabel(done);
     }
 
-    private static void generateCreateRecord(MethodVisitor mv, Class<?> cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields) {
+    private static void generateCreateRecord(MethodVisitor mv, Class<?> cls, String className, FieldDescriptor[] fds, FieldDescriptor[] defaultFields, boolean register) {
         Class<?>[] args = getConstructorArgs(fds, defaultFields);
         int length = args.length;
 
         try {
             Constructor c = cls.getDeclaredConstructor(args);
-            strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c, (v) -> {
+            strategy.emitRecordConstructorCall(mv, c.getDeclaringClass(), className, c, register, (v) -> {
                 for (int i = 0; i < length; i++) {
                     v.visitVarInsn(Type.getType(args[i]).getOpcode(ILOAD), 3 + i * 2);
                 }

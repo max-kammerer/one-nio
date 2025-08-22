@@ -24,7 +24,7 @@ public abstract class GenerationStrategy {
 
     public abstract void emitReadObjectCall(MethodVisitor mv, Class clazz, MethodHandleInfo methodType);
 
-    public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator);
+    public abstract void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, boolean register, Consumer<MethodVisitor> argGenerator);
 
     public static GenerationStrategy createStrategy() {
         if (JavaVersion.isJava9Plus()) { //TODO: also check runtime flag

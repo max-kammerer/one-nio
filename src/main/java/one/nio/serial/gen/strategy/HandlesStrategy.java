@@ -399,11 +399,23 @@ public final class HandlesStrategy extends GenerationStrategy {
     }
 
     @Override
-    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator) {
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, boolean register, Consumer<MethodVisitor> argGenerator) {
         mv.visitFieldInsn(GETSTATIC, className, "$$$constructor", Type.getDescriptor(MethodHandle.class));
         argGenerator.accept(mv);
         Type[] types = Arrays.stream(constuctor.getParameterTypes()).map(HandlesStrategy::eraseClassType).toArray(Type[]::new);
         mv.visitMethodInsn(INVOKEVIRTUAL, Type.getType(MethodHandle.class).getInternalName(), "invoke", Type.getMethodDescriptor(eraseClassType(clazz), types), false);
+
+        if (register) {
+//            mv.visitInsn(DUP);
+//            mv.visitVarInsn(ALOAD, 1);
+//            mv.visitInsn(SWAP);
+//
+////        emitNewInstance(mv, className, cls);
+////        mv.visitInsn(DUP_X1);
+//            mv.visitMethodInsn(INVOKEVIRTUAL, "one/nio/serial/DataStream", "register", "(Ljava/lang/Object;)V", false);
+
+        }
+
     }
 
     private static Type eraseTypeIfNeeded(Field field) {

@@ -118,7 +118,7 @@ public final class MagicAccessorStrategy extends GenerationStrategy {
     }
 
     @Override
-    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, Consumer<MethodVisitor> argGenerator) {
+    public void emitRecordConstructorCall(MethodVisitor mv, Class clazz, String className, Constructor constuctor, boolean register, Consumer<MethodVisitor> argGenerator) {
         mv.visitInsn(DUP);
 
         argGenerator.accept(mv);
