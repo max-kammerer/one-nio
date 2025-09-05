@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: [8, 11, 17, 21, 23, 24, 25-ea]
+        jdk: [8, 11, 17, 21, 23, 24, 25-ea, 26-ea]
         include:
           - jdk: 8
             main_jdk: 8
@@ -28,6 +28,10 @@ jobs:
           - jdk: 25-ea
             main_jdk: 8
             second_jdk: 25-ea
+          - jdk: 26-ea
+            main_jdk: 8
+            second_jdk: 26-ea
+
 
     steps:
       - uses: actions/checkout@v3
